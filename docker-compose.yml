@@ -1,0 +1,68 @@
+version: "3.9"
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: job_queue
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  api:
+    build: .
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000
+    ports:
+      - "8000:8000"
+    environment:
+      DATABASE_URL: postgresql+asyncpg://postgres:password@postgres:5432/job_queue
+      DATABASE_URL_SYNC: postgresql://postgres:password@postgres:5432/job_queue
+      REDIS_URL: redis://redis:6379
+      SECRET_KEY: ${SECRET_KEY:-change-me-in-prod}
+      WEBHOOK_SECRET: ${WEBHOOK_SECRET:-change-me-in-prod}
+      APP_ENV: ${APP_ENV:-development}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  worker:
+    build: .
+    command: python -m app.worker.worker
+    environment:
+      DATABASE_URL: postgresql+asyncpg://postgres:password@postgres:5432/job_queue
+      DATABASE_URL_SYNC: postgresql://postgres:password@postgres:5432/job_queue
+      REDIS_URL: redis://redis:6379
+      SECRET_KEY: ${SECRET_KEY:-change-me-in-prod}
+      WEBHOOK_SECRET: ${WEBHOOK_SECRET:-change-me-in-prod}
+      WORKER_CONCURRENCY: ${WORKER_CONCURRENCY:-5}
+      APP_ENV: ${APP_ENV:-development}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    deploy:
+      replicas: 1  # scale with: docker-compose up --scale worker=3
+
+volumes:
+  pgdata:
