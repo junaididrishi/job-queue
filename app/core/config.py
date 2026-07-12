@@ -10,6 +10,7 @@ class Settings(BaseSettings):
 
     # Store the raw database URL from environment or use default
     DATABASE_URL_RAW: str = "postgresql+asyncpg://postgres:password@localhost:5432/job_queue"
+    DATABASE_URL: str = "postgresql+asyncpg://postgres:password@localhost:5432/job_queue"
     DATABASE_URL_SYNC: str = "postgresql://postgres:password@localhost:5432/job_queue"
 
     REDIS_URL: str = "redis://localhost:6379"
