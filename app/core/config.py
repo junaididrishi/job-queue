@@ -1,6 +1,6 @@
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from functools import lru_cache
-
+import os
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
@@ -8,7 +8,8 @@ class Settings(BaseSettings):
     APP_ENV: str = "development"
     PORT: int = 8000
 
-    DATABASE_URL: str = "postgresql+asyncpg://postgres:password@localhost:5432/job_queue"
+    # Store the raw database URL from environment or use default
+    DATABASE_URL_RAW: str = "postgresql+asyncpg://postgres:password@localhost:5432/job_queue"
     DATABASE_URL_SYNC: str = "postgresql://postgres:password@localhost:5432/job_queue"
 
     REDIS_URL: str = "redis://localhost:6379"
@@ -33,6 +34,15 @@ class Settings(BaseSettings):
     QUEUE_DEAD: str = "tasks:dead"
 
     WORKER_HEARTBEAT_INTERVAL: int = 10
+
+    @property
+    def DATABASE_URL(self) -> str:
+        """Ensure the database URL always uses asyncpg driver."""
+        url = self.DATABASE_URL_RAW
+        # If the URL starts with postgresql:// (not postgresql+asyncpg://), fix it
+        if url.startswith("postgresql://") and not url.startswith("postgresql+asyncpg://"):
+            url = url.replace("postgresql://", "postgresql+asyncpg://", 1)
+        return url
 
 
 @lru_cache
